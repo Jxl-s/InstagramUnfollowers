@@ -5,6 +5,14 @@
 A nifty tool that lets you see who doesn't follow you back on Instagram.  
 <u>Browser-based and requires no downloads or installations!</u>
 
+## ✨ New Features
+
+### 🔄 Changes Tracking
+- **New Followers/Unfollowers**: Track who started or stopped following you since your last scan
+- **New Followings/Unfollowings**: Track who you started or stopped following since your last scan
+- **Historical View**: View changes from previous scans by selecting specific dates
+- **Local Storage**: All change history is saved locally in your browser
+
 ## ⚠️ WARNING
 
 This version utilizes the Instagram API for better performance.  
@@ -37,7 +45,9 @@ This version utilizes the Instagram API for better performance.
 
 9. ✅ Select users to unfollow using the checkboxes
 
-10. ⚙️ Customize script timings via the "Settings" button:
+10. 🔄 Switch to the "Changes" tab to view new followers/unfollowers and followings/unfollowings
+
+11. ⚙️ Customize script timings via the "Settings" button:
 
     <img src="./assets/settings.png" alt="Settings screen" />
 
@@ -54,6 +64,7 @@ For Android users who want to use it on mobile:
 - Processing time increases with the number of users to check
 - Script works on both Chromium and Firefox-based browsers
 - The script takes a few more seconds to load on mobile
+- First scan will not show changes (needs previous scan data for comparison)
 
 ## 🛠️ Development
 

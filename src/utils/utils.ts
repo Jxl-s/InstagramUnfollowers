@@ -4,6 +4,7 @@ import { ScanningTab } from "../model/scanning-tab";
 import { ScanningFilter } from "../model/scanning-filter";
 import { UnfollowLogEntry } from "../model/unfollow-log-entry";
 import { UnfollowFilter } from "../model/unfollow-filter";
+import { ChangeEntry } from "../model/change-entry";
 
 export async function copyListToClipboard(nonFollowersList: readonly UserNode[]): Promise<void> {
   const sortedList = [...nonFollowersList].sort((a, b) => (a.username > b.username ? 1 : -1));
@@ -17,13 +18,18 @@ export async function copyListToClipboard(nonFollowersList: readonly UserNode[])
   alert('List copied to clipboard!');
 }
 
-export function getMaxPage(nonFollowersList: readonly UserNode[]): number {
-  const pageCalc = Math.ceil(nonFollowersList.length / UNFOLLOWERS_PER_PAGE);
+export function getMaxPage(list: readonly UserNode[] | readonly ChangeEntry[]): number {
+  const pageCalc = Math.ceil(list.length / UNFOLLOWERS_PER_PAGE);
   return pageCalc < 1 ? 1 : pageCalc;
 }
 
 export function getCurrentPageUnfollowers(nonFollowersList: readonly UserNode[], currentPage: number): readonly UserNode[] {
   const sortedList = [...nonFollowersList].sort((a, b) => (a.username > b.username ? 1 : -1));
+  return sortedList.splice(UNFOLLOWERS_PER_PAGE * (currentPage - 1), UNFOLLOWERS_PER_PAGE);
+}
+
+export function getCurrentPageChanges(changesList: readonly ChangeEntry[], currentPage: number): readonly ChangeEntry[] {
+  const sortedList = [...changesList].sort((a, b) => b.timestamp - a.timestamp); // Most recent first
   return sortedList.splice(UNFOLLOWERS_PER_PAGE * (currentPage - 1), UNFOLLOWERS_PER_PAGE);
 }
 
@@ -47,6 +53,9 @@ export function getUsersForDisplay(
         if (!isWhitelisted) {
           continue;
         }
+        break;
+      case "changes":
+        // For changes tab, we don't filter by whitelist status
         break;
       default:
         assertUnreachable(currentTab);
@@ -129,6 +138,15 @@ export function urlGenerator(nextCode?: string): string {
     return `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables={"id":"${ds_user_id}","include_reel":"true","fetch_mutual":"false","first":"24"}`;
   }
   return `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables={"id":"${ds_user_id}","include_reel":"true","fetch_mutual":"false","first":"24","after":"${nextCode}"}`;
+}
+
+export function followersUrlGenerator(nextCode?: string): string {
+  const ds_user_id = getCookie('ds_user_id');
+  if (nextCode === undefined) {
+    // First url for followers
+    return `https://www.instagram.com/graphql/query/?query_hash=5aefa9893005572d237da5068082d8d5&variables={"id":"${ds_user_id}","include_reel":"true","fetch_mutual":"false","first":"24"}`;
+  }
+  return `https://www.instagram.com/graphql/query/?query_hash=5aefa9893005572d237da5068082d8d5&variables={"id":"${ds_user_id}","include_reel":"true","fetch_mutual":"false","first":"24","after":"${nextCode}"}`;
 }
 
 export function unfollowUserUrlGenerator(idToUnfollow: string): string {

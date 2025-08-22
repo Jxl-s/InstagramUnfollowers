@@ -3,6 +3,8 @@ import { ScanningTab } from "./scanning-tab";
 import { ScanningFilter } from "./scanning-filter";
 import { UnfollowLogEntry } from "./unfollow-log-entry";
 import { UnfollowFilter } from "./unfollow-filter";
+import { ChangeEntry } from "./change-entry";
+import { ScanHistoryEntry } from "./scan-history";
 
 type ScanningState = {
   readonly status: 'scanning';
@@ -14,6 +16,11 @@ type ScanningState = {
   readonly whitelistedResults: readonly UserNode[];
   readonly selectedResults: readonly UserNode[];
   readonly filter: ScanningFilter;
+  readonly changeHistory: readonly ChangeEntry[];
+  readonly scanHistory: readonly ScanHistoryEntry[];
+  readonly selectedDate?: string; // For viewing changes on a specific date
+  readonly previousFollowers: readonly UserNode[];
+  readonly previousFollowings: readonly UserNode[];
 };
 
 type UnfollowingState = {

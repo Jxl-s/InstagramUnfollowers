@@ -338,3 +338,64 @@ html {
         width: 100%;
     }
 }
+
+.changes-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid variables.$clr-border;
+
+    select {
+        background-color: variables.$bg-secondary;
+        color: variables.$clr-white;
+        border: 1px solid variables.$clr-border;
+        border-radius: variables.$border-radius;
+        padding: 0.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+
+        &:focus {
+            outline: none;
+            border-color: variables.$clr-primary;
+        }
+    }
+}
+
+.change-item {
+    border-left: 4px solid transparent;
+    transition: border-color 0.2s ease;
+
+    &.change-item {
+        border-left-color: variables.$clr-primary;
+    }
+}
+
+.change-type-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    margin-right: 1rem;
+    padding: 0.5rem;
+    background-color: variables.$bg-secondary;
+    border-radius: variables.$border-radius;
+
+    .change-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .change-label {
+        font-size: 0.75rem;
+        text-align: center;
+        line-height: 1.2;
+    }
+}
+
+.change-date {
+    color: variables.$clr-text-secondary;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}

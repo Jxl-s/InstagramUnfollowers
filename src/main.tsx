@@ -14,7 +14,7 @@ import {
   assertUnreachable,
   getCookie,
   getCurrentPageUnfollowers,
-  getUsersForDisplay, sleep, unfollowUserUrlGenerator, urlGenerator,
+  getUsersForDisplay, sleep, unfollowUserUrlGenerator, urlGenerator, followersUrlGenerator,
 } from "./utils/utils";
 import { NotSearching } from "./components/NotSearching";
 import { State } from "./model/state";
@@ -22,6 +22,7 @@ import { Searching } from "./components/Searching";
 import { Toolbar } from "./components/Toolbar";
 import { Unfollowing } from "./components/Unfollowing";
 import { Timings } from "./model/timings";
+import { loadPreviousScanData, detectChanges, saveScanHistory, loadChangeHistory, saveChangeHistory } from "./utils/change-utils";
 
 // pause
 let scanningPaused = false;
@@ -71,6 +72,11 @@ function App() {
     const whitelistedResultsFromStorage: string | null = localStorage.getItem(WHITELISTED_RESULTS_STORAGE_KEY);
     const whitelistedResults: readonly UserNode[] =
       whitelistedResultsFromStorage === null ? [] : JSON.parse(whitelistedResultsFromStorage);
+    
+    // Load previous scan data for change detection
+    const previousScanData = loadPreviousScanData();
+    const existingChangeHistory = loadChangeHistory();
+    
     setState({
       status: "scanning",
       page: 1,
@@ -87,6 +93,10 @@ function App() {
         showPrivate: true,
         showWithOutProfilePicture: true,
       },
+      changeHistory: existingChangeHistory,
+      scanHistory: [],
+      previousFollowers: previousScanData.followers,
+      previousFollowings: previousScanData.followings,
     });
   };
 
@@ -233,6 +243,7 @@ function App() {
       let currentFollowedUsersCount = 0;
       let totalFollowedUsersCount = -1;
 
+      // Scan followings (people you follow)
       while (hasNext) {
         let receivedData: User;
         try {
@@ -257,7 +268,7 @@ function App() {
           }
           const newState: State = {
             ...prevState,
-            percentage: Math.floor((currentFollowedUsersCount / totalFollowedUsersCount) * 100),
+            percentage: Math.floor((currentFollowedUsersCount / totalFollowedUsersCount) * 50), // Half progress for followings
             results,
           };
           return newState;
@@ -278,6 +289,79 @@ function App() {
         }
         setToast({ show: false });
       }
+
+      // Now scan followers (people who follow you)
+      const followers: UserNode[] = [];
+      scrollCycle = 0;
+      url = followersUrlGenerator();
+      hasNext = true;
+      let currentFollowersCount = 0;
+      let totalFollowersCount = -1;
+
+      while (hasNext) {
+        let receivedData: User;
+        try {
+          receivedData = (await fetch(url).then(res => res.json())).data.user.edge_followed_by;
+        } catch (e) {
+          console.error(e);
+          continue;
+        }
+
+        if (totalFollowersCount === -1) {
+          totalFollowersCount = receivedData.count;
+        }
+
+        hasNext = receivedData.page_info.has_next_page;
+        url = followersUrlGenerator(receivedData.page_info.end_cursor);
+        currentFollowersCount += receivedData.edges.length;
+        receivedData.edges.forEach(x => followers.push(x.node));
+
+        setState(prevState => {
+          if (prevState.status !== "scanning") {
+            return prevState;
+          }
+          const newState: State = {
+            ...prevState,
+            percentage: 50 + Math.floor((currentFollowersCount / totalFollowersCount) * 50), // Second half progress for followers
+            results,
+          };
+          return newState;
+        });
+
+        // Pause scanning if user requested so.
+        while (scanningPaused) {
+          await sleep(1000);
+          console.info("Scan paused");
+        }
+
+        await sleep(Math.floor(Math.random() * (timings.timeBetweenSearchCycles - timings.timeBetweenSearchCycles * 0.7)) + timings.timeBetweenSearchCycles);
+        scrollCycle++;
+        if (scrollCycle > 6) {
+          scrollCycle = 0;
+          setToast({ show: true, text: `Sleeping ${timings.timeToWaitAfterFiveSearchCycles / 1000 } seconds to prevent getting temp blocked` });
+          await sleep(timings.timeToWaitAfterFiveSearchCycles);
+        }
+        setToast({ show: false });
+      }
+
+      // Detect changes and save history
+      const changes = detectChanges(results, state.previousFollowings, followers, state.previousFollowers);
+      saveScanHistory(followers, results);
+      saveChangeHistory(changes);
+
+      setState(prevState => {
+        if (prevState.status !== "scanning") {
+          return prevState;
+        }
+        const newState: State = {
+          ...prevState,
+          percentage: 100,
+          results,
+          changeHistory: [...prevState.changeHistory, ...changes],
+        };
+        return newState;
+      });
+
       setToast({ show: true, text: "Scanning completed!" });
     };
     scan();

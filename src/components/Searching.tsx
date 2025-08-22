@@ -1,8 +1,9 @@
 import React from "react";
-import { assertUnreachable, getCurrentPageUnfollowers, getMaxPage, getUsersForDisplay } from "../utils/utils";
+import { assertUnreachable, getCurrentPageUnfollowers, getMaxPage, getUsersForDisplay, getCurrentPageChanges } from "../utils/utils";
 import { State } from "../model/state";
 import { UserNode } from "../model/user";
 import { WHITELISTED_RESULTS_STORAGE_KEY } from "../constants/constants";
+import { getChangeTypeLabel, getChangeTypeIcon, getChangesForDate, getAvailableDates } from "../utils/change-utils";
 
 
 export interface SearchingProps {
@@ -96,8 +97,18 @@ export const Searching = ({
           </label>
         </menu>
         <div className="grow">
-          <p>Displayed: {usersForDisplay.length}</p>
-          <p>Total: {state.results.length}</p>
+          <p>Displayed: {
+            state.currentTab === "changes" 
+              ? (state.selectedDate 
+                  ? getChangesForDate(state.changeHistory, state.selectedDate).length
+                  : state.changeHistory.length)
+              : usersForDisplay.length
+          }</p>
+          <p>Total: {
+            state.currentTab === "changes" 
+              ? state.changeHistory.length
+              : state.results.length
+          }</p>
         </div>
         {/* Scan controls */}
         <div className="controls">
@@ -124,11 +135,23 @@ export const Searching = ({
             ❮
           </a>
           <span>
-            {state.page}&nbsp;/&nbsp;{getMaxPage(usersForDisplay)}
+            {state.page}&nbsp;/&nbsp;{getMaxPage(
+              state.currentTab === "changes" 
+                ? (state.selectedDate 
+                    ? getChangesForDate(state.changeHistory, state.selectedDate)
+                    : state.changeHistory)
+                : usersForDisplay
+            )}
           </span>
           <a
             onClick={() => {
-              if (state.page < getMaxPage(usersForDisplay)) {
+              if (state.page < getMaxPage(
+                state.currentTab === "changes" 
+                  ? (state.selectedDate 
+                      ? getChangesForDate(state.changeHistory, state.selectedDate)
+                      : state.changeHistory)
+                  : usersForDisplay
+              )) {
                 setState({
                   ...state,
                   page: state.page + 1,
@@ -205,8 +228,131 @@ export const Searching = ({
           >
             Whitelisted
           </div>
+          <div
+            className={`tab ${state.currentTab === "changes" ? "tab-active" : ""}`}
+            onClick={() => {
+              if (state.currentTab === "changes") {
+                return;
+              }
+              setState({
+                ...state,
+                currentTab: "changes",
+                selectedResults: [],
+              });
+            }}
+          >
+            Changes
+          </div>
         </nav>
-        {getCurrentPageUnfollowers(usersForDisplay, state.page).map(user => {
+        {state.currentTab === "changes" && (
+          <div className="changes-controls">
+            <select
+              value={state.selectedDate || ""}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                const target = e.target as HTMLSelectElement;
+                setState({
+                  ...state,
+                  selectedDate: target.value || undefined,
+                  page: 1,
+                });
+              }}
+            >
+              <option value="">All Changes</option>
+              {getAvailableDates(state.changeHistory).map(date => (
+                <option key={date} value={date}>
+                  {new Date(date).toLocaleDateString()}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {state.currentTab === "changes" ? (
+          // Display changes
+          getCurrentPageChanges(
+            state.selectedDate 
+              ? getChangesForDate(state.changeHistory, state.selectedDate)
+              : state.changeHistory,
+            state.page
+          ).map(change => {
+            const firstLetter = change.user.username.substring(0, 1).toUpperCase();
+            return (
+              <>
+                {firstLetter !== currentLetter && onNewLetter(firstLetter)}
+                <div className="result-item change-item">
+                  <div className="flex grow align-center">
+                    <div className="change-type-indicator">
+                      <span className="change-icon">{getChangeTypeIcon(change.changeType)}</span>
+                      <span className="change-label">{getChangeTypeLabel(change.changeType)}</span>
+                    </div>
+                    <div
+                      className="avatar-container"
+                      onClick={e => {
+                        // Prevent selecting result when trying to add to whitelist.
+                        e.preventDefault();
+                        e.stopPropagation();
+                        let whitelistedResults: readonly UserNode[] = [];
+                                              switch (state.currentTab) {
+                        case "non_whitelisted":
+                          whitelistedResults = [...state.whitelistedResults, change.user];
+                          break;
+
+                        case "whitelisted":
+                          whitelistedResults = state.whitelistedResults.filter(
+                            result => result.id !== change.user.id,
+                          );
+                          break;
+
+                        case "changes":
+                          whitelistedResults = [...state.whitelistedResults, change.user];
+                          break;
+
+                        default:
+                          assertUnreachable(state.currentTab);
+                      }
+                        localStorage.setItem(
+                          WHITELISTED_RESULTS_STORAGE_KEY,
+                          JSON.stringify(whitelistedResults),
+                        );
+                        setState({ ...state, whitelistedResults });
+                      }}
+                    >
+                      <img
+                        className="avatar"
+                        alt={change.user.username}
+                        src={change.user.profile_pic_url}
+                      />
+                      <span className="avatar-icon-overlay-container">
+                        <UserCheckIcon />
+                      </span>
+                    </div>
+                    <div className="flex column m-medium">
+                      <a
+                        className="fs-xlarge"
+                        target="_blank"
+                        href={`/${change.user.username}`}
+                        rel="noreferrer"
+                      >
+                        {change.user.username}
+                      </a>
+                      <span className="fs-medium">{change.user.full_name}</span>
+                      <span className="fs-small change-date">
+                        {new Date(change.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    {change.user.is_verified && <div className="verified-badge">✔</div>}
+                    {change.user.is_private && (
+                      <div className="flex justify-center w-100">
+                        <span className="private-indicator">Private</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            );
+          })
+        ) : (
+          // Display regular users
+          getCurrentPageUnfollowers(usersForDisplay, state.page).map(user => {
           const firstLetter = user.username.substring(0, 1).toUpperCase();
           return (
             <>
@@ -229,6 +375,10 @@ export const Searching = ({
                           whitelistedResults = state.whitelistedResults.filter(
                             result => result.id !== user.id,
                           );
+                          break;
+
+                        case "changes":
+                          whitelistedResults = [...state.whitelistedResults, user];
                           break;
 
                         default:
@@ -281,7 +431,8 @@ export const Searching = ({
               </label>
             </>
           );
-        })}
+        })
+        )}
       </article>
     </section>
   );
